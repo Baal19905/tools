@@ -1,0 +1,37 @@
+#!/bin/bash
+
+if [ $# -lt 1 ];
+then
+    echo "usage: $0 <sqlfile1> <sqlfile2> ..."
+    exit 1
+fi
+
+index=0
+for arg in $*
+do
+    files[$index]=$arg
+    index=`expr $index + 1`
+done
+
+
+read -p "usr:" usr
+stty -echo
+read -p "master root password:" pwd
+stty echo
+echo
+
+
+size=1073741824
+result=(`mysql -uroot -p${pwd} -e "show variables like 'max_allowed_packet'" 2>/dev/null | grep max_allowed_packet`)
+old_max_packet=${result[1]}
+# 扩大max_allowed_packet
+mysql -uroot -p${pwd} -e "SET GLOBAL max_allowed_packet=${size};" 2>/dev/null
+
+for file in ${files[@]}
+do
+    echo "importing ${file} ..."
+    mysql -u${usr} -p${pwd} --max-allowed-packet=${size} --silent -e "SET @@SESSION.SQL_LOG_BIN=0;source ${file};SET @@SESSION.SQL_LOG_BIN=1;" --force 
+done
+
+# 还原max_allowed_packet
+mysql -uroot -p${pwd} -e "SET GLOBAL max_allowed_packet=${old_max_packet};" 2>/dev/null

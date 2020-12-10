@@ -1,0 +1,26 @@
+#!/bin/bash
+
+if [ $# -lt 1 ];
+then
+    echo "usage: $0 <db1 db2 db3...>"
+    exit 1
+fi
+
+index=0
+for arg in $*
+do
+    dbs[$index]=$arg
+    index=`expr $index + 1`
+done
+
+read -p "usr:" usr
+stty -echo
+read -p "master root password:" pwd
+stty echo
+echo
+
+for db in ${dbs[*]}
+do
+    echo "exporting ${db} ..."
+    mysqldump -uroot -p${pwd} --databases ${db} > ${db}.sql
+done
