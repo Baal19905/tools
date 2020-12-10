@@ -1,0 +1,52 @@
+#!/bin/bash
+
+if [ $# -lt 2 ];
+then
+    echo "usage: $0 <host:port> <db1> <db2> ..."
+    exit 1
+fi
+
+function get_primary()
+{
+    db=$1
+    table=$2
+    primary_columns=(`mysql -u${usr} -p${pwd} -h${host} -P${port} -e "SELECT GROUP_CONCAT(COLUMN_NAME) FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE constraint_name='PRIMARY' AND table_schema='"${db}"' AND table_name='"${table}"'" 2>/dev/null`)
+    primary_columns=${primary_columns[1]}
+}
+
+function checksum()
+{
+    db=$1
+    table=$2
+    checksum_sql=(`mysql -u${usr} -p${pwd} -h${host} -P${port} -e "SELECT CONCAT('select ${primary_columns}, MD5(CONCAT(', GROUP_CONCAT('CAST(HEX(IFNULL(',COLUMN_NAME,','''')) AS CHAR)'), ')) as checksum from ', table_schema, '.', table_name, ';') as tmp FROM information_schema.COLUMNS GROUP BY table_name, table_schema HAVING table_name = '"${table}"' and table_schema='"${db}"'" 2>/dev/null`)
+    checksum_sql=(${checksum_sql[*]:1:${#checksum_sql[*]}})
+    checksum_sql=${checksum_sql[*]}
+    mysql -u${usr} -p${pwd} -h${host} -P${port} -e "${checksum_sql}" 2>/dev/null > "${db}.${table}@${host}.checksum"
+    echo "checksum ${db}.${table}@${host} ..."
+}
+
+host=${1%:*}
+port=${1#*:}
+dbs=($*)
+dbs=(${dbs[*]:1:${#dbs[*]}})
+
+
+read -p "usr:" usr
+stty -echo
+read -p "pwd:" pwd
+stty echo
+echo
+
+
+for((i=0;i<${#dbs[*]};i++))
+do
+    tables=(`mysql -u${usr} -p${pwd} -h${host} -P${port} -e "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='"${dbs[i]}"'" 2>/dev/null`)
+    tables=(${tables[*]:1:${#tables[*]}})
+    for((j=0;j<${#tables[*]};j++))
+    do
+        get_primary ${dbs[i]} ${tables[j]}
+        checksum ${dbs[i]} ${tables[j]}
+    done
+done
+
+

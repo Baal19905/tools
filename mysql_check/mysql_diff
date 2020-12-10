@@ -1,0 +1,38 @@
+#!/bin/bash
+
+if [ $# -ne 2 ];
+then
+    echo "usage: $0 <master_ip:port> <slave_ip:port>"
+    exit 1
+fi
+
+master_ip_port=$1
+slave_ip_port=$2
+master_ip=${master_ip_port%:*}
+slave_ip=${slave_ip_port%:*}
+
+#mysql_checksum ${master_ip_port} infoservice user login anls < master.auth 2>/dev/null
+#mysql_checksum ${slave_ip_port} infoservice user login anls < slave.auth 2>/dev/null
+
+
+rm *.diff -f
+for table in `cat table_check_list`
+do
+    if [ ! -f "${table}@${master_ip}.checksum" ] || [ ! -f "${table}@${slave_ip}.checksum" ];
+    then
+        if [ ! -f "${table}@${master_ip}.checksum" ];
+        then
+            echo "${table}@${master_ip} not exist!" >> ${table}.diff
+        fi
+        if [ ! -f "${table}@${slave_ip}.checksum" ];
+        then
+            echo "${table}@${slave_ip} not exist!" >> ${table}.diff
+        fi
+    else
+        if [ `diff -u ${table}@${master_ip}.checksum ${table}@${slave_ip}.checksum 2>/dev/null | wc -l` -gt 0 ];
+        then
+            diff -u ${table}@${master_ip}.checksum ${table}@${slave_ip}.checksum > ${table}.diff
+            echo "find differences between ${table}@${master_ip} and ${table}@${slave_ip}"
+        fi
+    fi
+done
