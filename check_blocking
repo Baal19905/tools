@@ -1,0 +1,18 @@
+#!/bin/bash
+
+
+read -p "usr:" usr
+stty -echo
+read -p "password:" pwd
+stty echo
+echo
+
+sql="SELECT
+    waiting_trx_id,
+    waiting_pid,
+    waiting_query,
+    blocking_trx_id,
+    blocking_pid,
+    blocking_query FROM sys.innodb_lock_waits;"
+
+mysql -u${usr} -p${pwd} -e"${sql}"
